@@ -1,0 +1,11 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "invoices": {
+      "$invoiceId": {
+        ".validate": "newData.hasChildren(['userId', 'invoiceNumber', 'customer', 'items', 'currency', 'taxRate', 'discount', 'subtotal', 'taxAmount', 'total', 'notes', 'createdAt'])"
+      }
+    }
+  }
+}
