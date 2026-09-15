@@ -304,6 +304,16 @@ label {
   font-weight: 600;
 }
 
+.success {
+  background: rgba(54, 211, 153, 0.08);
+  color: var(--success);
+  padding: 11px 12px;
+  border: 1px solid rgba(54, 211, 153, 0.18);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .app {
   min-height: 100vh;
   display: flex;

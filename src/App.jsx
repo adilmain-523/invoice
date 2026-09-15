@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signOut
 } from "firebase/auth";
 import {
@@ -11,6 +12,13 @@ import { auth, db } from "./firebase";
 
 const currencies = ["USD","EUR","GBP","PKR","INR","AED","SAR","CAD","AUD","JPY"];
 const money = (n, c) => new Intl.NumberFormat(undefined,{style:"currency",currency:c}).format(Number(n)||0);
+const authErrorMessage = (code) => ({
+  "auth/invalid-email": "Enter a valid email address.",
+  "auth/operation-not-allowed": "Email/password sign-in is disabled in Firebase Authentication.",
+  "auth/user-not-found": "No account was found for this email address.",
+  "auth/too-many-requests": "Too many attempts. Please wait and try again.",
+  "auth/network-request-failed": "Network error. Check your connection and try again."
+}[code] || code?.replace("auth/","").replaceAll("-"," ") || "Authentication failed");
 
 // CHANGED: Initialized quantity and price to empty strings so placeholders appear when empty
 const blankItem = () => ({ description:"", quantity:"", price:"" });
@@ -58,14 +66,21 @@ function App(){
 
 function Auth(){
   const [mode,setMode]=useState("login"), [email,setEmail]=useState(""), [password,setPassword]=useState("");
-  const [error,setError]=useState(""), [busy,setBusy]=useState(false), [showPassword,setShowPassword]=useState(false);
+  const [error,setError]=useState(""), [message,setMessage]=useState(""), [busy,setBusy]=useState(false), [showPassword,setShowPassword]=useState(false);
   async function submit(e){
-    e.preventDefault(); setError(""); setBusy(true);
+    e.preventDefault(); setError(""); setMessage(""); setBusy(true);
     try{
       if(mode==="login") await signInWithEmailAndPassword(auth,email,password);
-      else await createUserWithEmailAndPassword(auth,email,password);
-    }catch(err){setError(err.code?.replace("auth/","").replaceAll("-"," ") || "Authentication failed");}
+      else if(mode==="signup") await createUserWithEmailAndPassword(auth,email,password);
+      else {
+        await sendPasswordResetEmail(auth,email);
+        setMessage("Password reset instructions sent. Check your email inbox.");
+      }
+    }catch(err){setError(authErrorMessage(err.code));}
     finally{setBusy(false)}
+  }
+  function changeMode(nextMode){
+    setMode(nextMode); setError(""); setMessage(""); setPassword("");
   }
   return <main className="auth-page"><section className="auth-shell">
     <div className="auth-hero">
@@ -80,25 +95,29 @@ function Auth(){
     </div>
     <div className="auth-card">
       <div className="brand"><span>▣</span> InvoiceFlow</div>
-      <h2>{mode==="login"?"Welcome back":"Create your account"}</h2>
-      <p className="muted">{mode==="login"?"Sign in to manage your invoices.":"Start creating professional invoices."}</p>
+      <h2>{mode==="login"?"Welcome back":mode==="signup"?"Create your account":"Reset your password"}</h2>
+      <p className="muted">{mode==="login"?"Sign in to manage your invoices.":mode==="signup"?"Start creating professional invoices.":"Enter your email and we’ll send you a reset link."}</p>
       <form onSubmit={submit}>
         <label>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} /></label>
-        <label>
-          Password
-          <div className="password-field">
-            <input type={showPassword ? "text" : "password"} required minLength="6" value={password} onChange={e=>setPassword(e.target.value)} />
-            <button type="button" className="password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} onClick={()=>setShowPassword(v=>!v)}>
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-        </label>
+        {mode !== "forgot" && <label>
+            Password
+            <div className="password-field">
+              <input type={showPassword ? "text" : "password"} required minLength="6" value={password} onChange={e=>setPassword(e.target.value)} />
+              <button type="button" className="password-toggle" aria-label={showPassword ? "Hide password" : "Show password"} onClick={()=>setShowPassword(v=>!v)}>
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
+          </label>}
         {error && <div className="error">{error}</div>}
-        <button className="primary wide" disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":"Sign up"}</button>
+        {message && <div className="success">{message}</div>}
+        <button className="primary wide" disabled={busy}>{busy?"Please wait…":mode==="login"?"Sign in":mode==="signup"?"Sign up":"Send reset link"}</button>
       </form>
-      <button className="link" onClick={()=>setMode(mode==="login"?"signup":"login")}>
-        {mode==="login"?"Need an account? Sign up":"Already have an account? Sign in"}
-      </button>
+      {mode === "login" && <>
+        <button className="link" onClick={()=>changeMode("forgot")}>Forgot password?</button>
+        <button className="link" onClick={()=>changeMode("signup")}>Need an account? Sign up</button>
+      </>}
+      {mode === "signup" && <button className="link" onClick={()=>changeMode("login")}>Already have an account? Sign in</button>}
+      {mode === "forgot" && <button className="link" onClick={()=>changeMode("login")}>Back to sign in</button>}
     </div>
   </section></main>
 }
